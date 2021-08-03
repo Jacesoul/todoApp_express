@@ -1,0 +1,28 @@
+{
+   "type": "mysql",
+   "host": "localhost",
+   "port": 3306,
+   "username": "root",
+   "password": "dnwltjfmq",
+   "database": "todoApp",
+   "timezone": "+09:00",
+   "synchronize": false,
+   "logging": true,
+   "entities": [
+      "src/entity/**/*.ts",
+      "./entity/**/*.js"
+   ],
+   "migrations": [
+      "src/migration/**/*.ts",
+      "./migration/**/*.js"
+   ],
+   "subscribers": [
+      "src/subscriber/**/*.ts",
+      "./subscriber/**/*.js"
+   ],
+   "cli": {
+      "entitiesDir": "src/entity",
+      "migrationsDir": "src/migration",
+      "subscribersDir": "src/subscriber"
+   }
+}
