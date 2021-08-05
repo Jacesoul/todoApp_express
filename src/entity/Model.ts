@@ -1,4 +1,4 @@
-import { BaseEntity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, BeforeInsert, Column} from "typeorm";
+import { BaseEntity, PrimaryGeneratedColumn, DeleteDateColumn, CreateDateColumn, UpdateDateColumn, BeforeInsert, Column} from "typeorm";
 import{v4 as uuid} from 'uuid'
 
 export default abstract class Model extends BaseEntity{
@@ -13,6 +13,9 @@ export default abstract class Model extends BaseEntity{
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt?: Date;
 
     constructor(model?: Partial<any>){
         super()
