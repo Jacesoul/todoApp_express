@@ -1,39 +1,42 @@
 import { Request, Response } from "express";
+import {getRepository} from 'typeorm';
+import {getConnection} from 'typeorm';
 import { Todo } from "../entity/Todo";
 import { Tag } from "../entity/Tag";
-import {getRepository} from 'typeorm';
 
 const bodyParser = require('body-parser')
-const express = require('express')
-const router = express.Router()
+const express    = require('express')
+const router     = express.Router()
 
 router.use(express.json())
 router.use(bodyParser.json()); 
 router.use(bodyParser.urlencoded({ extended: true })); 
 
 router.post('', async(req:Request, res:Response)=>{
+    const queryRunner = getConnection().createQueryRunner();
     try {
         const {content, tagname} = req.body
         const tag:any = await Tag.findOne({where: {name :req.body['tagname']}})
-        console.log(tag)
-
+        queryRunner.startTransaction();
         const todo = await Todo.create({
             content: req.body['content'],
             tag: tag
         }).save()
+        queryRunner.commitTransaction();
         return res.status(201).json({message: 'create successfully '})
     }catch(err){
+        queryRunner.rollbackTransaction();
         console.log(err)
         return res.status(500).json(err)
+    }finally{
+        queryRunner.release();
     }
 })
 
 router.get('', async(req:Request, res:Response)=>{
     try {
         const where = Object.keys(req.query).reduce((acc,curVal,idx)=>{
-            if (req.query[curVal]){
-                acc[curVal] = req.query[curVal]
-            }
+            if (req.query[curVal]){acc[curVal] = req.query[curVal]}
             return acc
         }, {})
         
@@ -54,7 +57,6 @@ router.get('', async(req:Request, res:Response)=>{
         } else{
             results = await Todo.find({})
         }
-        
         return res.status(200).json(results)
     }catch(err){
         console.log(err)
@@ -65,14 +67,11 @@ router.get('', async(req:Request, res:Response)=>{
 router.put('/:uuid', async(req:Request, res:Response)=>{
     const uuid = req.params.uuid
     const {content} = req.body
-
+    const queryRunner = getConnection().createQueryRunner();
     try { 
         const todo = await Todo.findOneOrFail({uuid})
-
         todo.content = content || todo.content
-
         await todo.save()
-
         return res.json(todo)
     }catch (err){
         console.log(err)
@@ -83,48 +82,58 @@ router.put('/:uuid', async(req:Request, res:Response)=>{
 router.patch('/:uuid', async(req:Request, res:Response)=>{
     const uuid = req.params.uuid
     const {isCompleted} = req.body
-
+    const queryRunner = getConnection().createQueryRunner();
     try { 
         const todo = await Todo.findOneOrFail({uuid})
-
         todo.isCompleted = isCompleted || todo.isCompleted
-
+        queryRunner.startTransaction();
         await todo.save()
-
+        queryRunner.commitTransaction();
         return res.json(todo)
     }catch (err){
+        queryRunner.rollbackTransaction();
         console.log(err)
         return res.status(500).json({error : 'Something went wrong!'})
+    }finally{
+        queryRunner.release();
     }
 })
 
 router.delete('/:uuid', async(req:Request, res:Response)=>{
     const uuid = req.params.uuid  
-
+    const queryRunner = getConnection().createQueryRunner();
     try { 
-        
         const todo = await Todo.findOneOrFail({uuid})
+        queryRunner.startTransaction();
         await todo.softRemove()
-        
+        queryRunner.commitTransaction();
         return res.status(204).json({message: 'Todo deleted successfully '})
     }catch (err){
+        queryRunner.rollbackTransaction();
         console.log(err)
         return res.status(500).json({error : 'Something went wrong!'})
+    }finally{
+        queryRunner.release();
     }
 })
 
 router.delete('', async(req:Request, res:Response)=>{
+    const queryRunner = getConnection().createQueryRunner();
     try { 
         const todos = await Todo.find()
+        queryRunner.startTransaction();
         todos.forEach(todo => {
             todo.softRemove()
         })
+        queryRunner.commitTransaction();
         return res.status(204).json({message: 'Todo deleted successfully '})
     }catch (err){
+        queryRunner.rollbackTransaction();
         console.log(err)
         return res.status(500).json({error : 'Something went wrong!'})
+    }finally{
+        queryRunner.release();
     }
 })
-
 
 module.exports = router
