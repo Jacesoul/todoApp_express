@@ -39,21 +39,37 @@ router.get('', async(req:Request, res:Response)=>{
             if (req.query[curVal]){acc[curVal] = req.query[curVal]}
             return acc
         }, {})
-        
         let results
         if (where['tagname'] && where['isCompleted']){
+            let boolCheck
+            if(where['isCompleted']==='true'){
+                boolCheck = true
+            } else{
+                boolCheck = false
+            }
             const sortedTodos = await getRepository(Tag)
             .createQueryBuilder("tag")
             .leftJoinAndSelect("tag.todos", "todo")
             .where("tag.name = :name", { name: where['tagname'] })
-            .andWhere("todo.isCompleted = :isCompleted", { isCompleted: where['isCompleted'] })
+            .andWhere("todo.isCompleted = :isCompleted", { isCompleted: boolCheck })
             .getMany();
-            results = sortedTodos[0].todos 
+            if (sortedTodos[0]===undefined){
+                results = sortedTodos
+            }else{
+                results = sortedTodos[0].todos
+            }
         } else if (where['tagname']){
             const sortedTodos = await Tag.findOne({ name: where['tagname'] },{ relations: ["todos"] })
             results = sortedTodos.todos 
         } else if (where['isCompleted']){
-            results= await Todo.find(where)
+            let boolCheck
+            if(where['isCompleted']==='true'){
+                boolCheck = true
+            } else{
+                boolCheck = false
+            }
+            results= await Todo.find({isCompleted : boolCheck})
+            
         } else{
             results = await Todo.find({})
         }
@@ -120,11 +136,20 @@ router.delete('/:uuid', async(req:Request, res:Response)=>{
 router.delete('', async(req:Request, res:Response)=>{
     const queryRunner = getConnection().createQueryRunner();
     try { 
-        const todos = await Todo.find()
-        queryRunner.startTransaction();
-        todos.forEach(todo => {
-            todo.softRemove()
-        })
+        if(req.query['clearAll']==='true'){
+            const todos = await Todo.find()
+            queryRunner.startTransaction();
+            todos.forEach(todo => {
+                todo.softRemove()
+            })
+        }else{
+            const todos = await Todo.find()
+            queryRunner.startTransaction();
+            const sortedTodos = todos.filter(todo => todo.isCompleted === true)
+            sortedTodos.forEach(todo => {
+                todo.softRemove()
+            })
+        }
         queryRunner.commitTransaction();
         return res.status(204).json({message: 'Todo deleted successfully '})
     }catch (err){

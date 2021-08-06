@@ -1,6 +1,6 @@
 {
    "type": "mysql",
-   "host": "localhost",
+   "host": "todoapp-express.cteji7fk9umm.ap-northeast-2.rds.amazonaws.com",
    "port": 3306,
    "username": "root",
    "password": "dnwltjfmq",
