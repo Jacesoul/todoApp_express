@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
-import {getRepository} from 'typeorm';
+import {getRepository, In} from 'typeorm';
 import {getConnection} from 'typeorm';
-import { Todo } from "../entity/Todo";
-import { Tag } from "../entity/Tag";
+import { Todo } from "../entity/todo";
+import { Tag } from "../entity/tag";
+import { TodoToTag } from "../entity/todototag";
+
 
 const bodyParser = require('body-parser')
 const express    = require('express')
@@ -12,96 +14,85 @@ router.use(express.json())
 router.use(bodyParser.json()); 
 router.use(bodyParser.urlencoded({ extended: true })); 
 
-router.post('', async(req:Request, res:Response)=>{
+router.post('', async(req:Request, res:Response, next)=>{
     const queryRunner = getConnection().createQueryRunner();
     try {
-        const {content, tagname} = req.body
-        const tag:any = await Tag.findOne({where: {name :req.body['tagname']}})
+        console.log(req.body.tag)
+        const {content, tag} = req.body
         queryRunner.startTransaction();
         const todo = await Todo.create({
-            content: req.body['content'],
-            tag: tag
+            content: content
         }).save()
+        const todototags =  tag.forEach( tagId => {
+            TodoToTag.create({
+                todoId: todo.id,
+                tagId: tagId
+            }).save()
+        }) 
         queryRunner.commitTransaction();
         return res.status(201).json({message: 'create successfully '})
     }catch(err){
         queryRunner.rollbackTransaction();
-        console.log(err)
-        return res.status(500).json(err)
+        console.error(err)
+        next(err)
     }finally{
         queryRunner.release();
     }
 })
 
-router.get('', async(req:Request, res:Response)=>{
-    try {
-        const where = Object.keys(req.query).reduce((acc,curVal,idx)=>{
-            if (req.query[curVal]){acc[curVal] = req.query[curVal]}
+router.get('', async(req:Request, res:Response, next)=>{
+    try{
+        const { isCompleted, tag } = req.query
+        console.log(isCompleted)
+        console.log(tag)
+        const where = Object.keys(req.query).reduce((acc,curVal)=>{
+            if (req.query[curVal]){
+                acc[curVal] = req.query[curVal]
+            }
+            console.log(acc)
             return acc
-        }, {})
-        let results
-        if (where['tagname'] && where['isCompleted']){
-            let boolCheck
-            if(where['isCompleted']==='true'){
-                boolCheck = true
-            } else{
-                boolCheck = false
+        },{})
+        console.log(where)
+        const results = await getRepository(TodoToTag).find({
+            relations: ["todo"],
+            where : {
+                tagId : In([tag]),
+                todo : {
+                    isCompleted : In([isCompleted])
+                }
             }
-            const sortedTodos = await getRepository(Tag)
-            .createQueryBuilder("tag")
-            .leftJoinAndSelect("tag.todos", "todo")
-            .where("tag.name = :name", { name: where['tagname'] })
-            .andWhere("todo.isCompleted = :isCompleted", { isCompleted: boolCheck })
-            .getMany();
-            if (sortedTodos[0]===undefined){
-                results = sortedTodos
-            }else{
-                results = sortedTodos[0].todos
-            }
-        } else if (where['tagname']){
-            const sortedTodos = await Tag.findOne({ name: where['tagname'] },{ relations: ["todos"] })
-            results = sortedTodos.todos 
-        } else if (where['isCompleted']){
-            let boolCheck
-            if(where['isCompleted']==='true'){
-                boolCheck = true
-            } else{
-                boolCheck = false
-            }
-            results= await Todo.find({isCompleted : boolCheck})
-            
-        } else{
-            results = await Todo.find({})
-        }
+        })
         return res.status(200).json(results)
-    }catch(err){
-        console.log(err)
-        return res.status(500).json({error : 'Something went wrong!'})
+    }
+    catch(err){
+        console.error(err)
+        next(err)
     }
 })
 
-router.put('/:uuid', async(req:Request, res:Response)=>{
-    const uuid = req.params.uuid
+router.put('/:id', async(req:Request, res:Response, next)=>{
     const {content} = req.body
     const queryRunner = getConnection().createQueryRunner();
     try { 
-        const todo = await Todo.findOneOrFail({uuid})
-        todo.content = content || todo.content
+        const todo = await Todo.findOne(req.params.id)
+        todo.content = content
         await todo.save()
         return res.json(todo)
     }catch (err){
-        console.log(err)
-        return res.status(500).json({error : 'Something went wrong!'})
+        queryRunner.rollbackTransaction();
+        console.error(err)
+        next(err)
+    }finally{
+        queryRunner.release();
     }
 })
 
-router.patch('/:uuid', async(req:Request, res:Response)=>{
-    const uuid = req.params.uuid
+router.patch('/:id', async(req:Request, res:Response, next)=>{
     const {isCompleted} = req.body
     const queryRunner = getConnection().createQueryRunner();
     try { 
-        const todo = await Todo.findOneOrFail({uuid})
-        todo.isCompleted = isCompleted || todo.isCompleted
+        const todo = await Todo.findOne(req.params.id)
+        todo.isCompleted = isCompleted
         queryRunner.startTransaction();
         await todo.save()
         queryRunner.commitTransaction();
@@ -109,17 +100,16 @@ router.patch('/:uuid', async(req:Request, res:Response)=>{
     }catch (err){
         queryRunner.rollbackTransaction();
         console.log(err)
-        return res.status(500).json({error : 'Something went wrong!'})
+        next(err)
     }finally{
         queryRunner.release();
     }
 })
 
-router.delete('/:uuid', async(req:Request, res:Response)=>{
-    const uuid = req.params.uuid  
+router.delete('/:id', async(req:Request, res:Response, next)=>{
     const queryRunner = getConnection().createQueryRunner();
     try { 
-        const todo = await Todo.findOneOrFail({uuid})
+        const todo = await Todo.findOne(req.params.id)
         queryRunner.startTransaction();
         await todo.softRemove()
         queryRunner.commitTransaction();
@@ -127,35 +117,29 @@ router.delete('/:uuid', async(req:Request, res:Response)=>{
     }catch (err){
         queryRunner.rollbackTransaction();
         console.log(err)
-        return res.status(500).json({error : 'Something went wrong!'})
+        next(err)
     }finally{
         queryRunner.release();
     }
 })
 
-router.delete('', async(req:Request, res:Response)=>{
+router.delete('', async(req:Request, res:Response, next)=>{
     const queryRunner = getConnection().createQueryRunner();
     try { 
-        if(req.query['clearAll']==='true'){
-            const todos = await Todo.find()
-            queryRunner.startTransaction();
-            todos.forEach(todo => {
-                todo.softRemove()
-            })
-        }else{
-            const todos = await Todo.find()
-            queryRunner.startTransaction();
-            const sortedTodos = todos.filter(todo => todo.isCompleted === true)
-            sortedTodos.forEach(todo => {
-                todo.softRemove()
-            })
-        }
+        const {isCompleted} = req.query
+        queryRunner.startTransaction();
+        await getRepository(Todo)
+        .createQueryBuilder()
+        .softDelete()
+        .from(Todo)
+        .where("isCompleted IN (:...isCompleteds)", { isCompleteds: [isCompleted]})
+        .execute();
         queryRunner.commitTransaction();
         return res.status(204).json({message: 'Todo deleted successfully '})
     }catch (err){
         queryRunner.rollbackTransaction();
         console.log(err)
-        return res.status(500).json({error : 'Something went wrong!'})
+        next(err)
     }finally{
         queryRunner.release();
     }

@@ -1,6 +1,6 @@
-import {Entity, Column, ManyToOne, JoinTable} from "typeorm";
+import {Entity, Column, OneToMany} from "typeorm";
 import Model from './Model'
-import {Tag} from "./Tag";
+import {TodoToTag} from "./todototag";
 import {Length} from "class-validator";
 
 
@@ -14,8 +14,8 @@ export class Todo extends Model {
     @Column({default: false})
     isCompleted : boolean;
 
-    @ManyToOne(() => Tag, tags => tags.todos)
-    tag:Tag;
+    @OneToMany(() => TodoToTag, todotoTags => todotoTags.todo)
+    todotoTags: TodoToTag[];
     
 
     static findByName(content: string) {

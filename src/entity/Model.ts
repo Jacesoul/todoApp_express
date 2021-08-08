@@ -1,12 +1,8 @@
-import { BaseEntity, PrimaryGeneratedColumn, DeleteDateColumn, CreateDateColumn, UpdateDateColumn, BeforeInsert, Column} from "typeorm";
-import{v4 as uuid} from 'uuid'
+import { BaseEntity, PrimaryGeneratedColumn, DeleteDateColumn, CreateDateColumn, UpdateDateColumn} from "typeorm";
 
 export default abstract class Model extends BaseEntity{
     @PrimaryGeneratedColumn()
     id: number;
-
-    @Column({type:'uuid'})
-    uuid: string
 
     @CreateDateColumn({type: 'timestamp'})
     createdAt: Date;
@@ -20,11 +16,6 @@ export default abstract class Model extends BaseEntity{
     constructor(model?: Partial<any>){
         super()
         Object.assign(this, model)
-    }
-
-    @BeforeInsert()
-        createUuid() {
-            this.uuid = uuid()
     }
 
     toJSON(){
