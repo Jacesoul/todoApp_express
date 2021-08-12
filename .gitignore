@@ -7,3 +7,4 @@ temp/
 .env
 Dockerfile
 ormconfig.json
+ormconfig

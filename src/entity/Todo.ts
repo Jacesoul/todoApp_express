@@ -24,4 +24,3 @@ export class Todo extends Model {
             .getMany();
     }
 }
-
